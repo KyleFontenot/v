@@ -33,6 +33,7 @@ pub mut:
 	user_agent string = 'v.http'
 	verbose    bool
 	user_ptr   voidptr
+	params     map[string]string
 	proxy      &HttpProxy = unsafe { nil }
 	// NOT implemented for ssl connections
 	// time = -1 for no timeout

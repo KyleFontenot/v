@@ -85,7 +85,7 @@ fn test_http_do() {
 	assert s_proxy.port == 8080
 	assert s_proxy.url == 'http://8.8.8.8:8080'
 
-	s_fetch := prepare(FetchConfig{
+	s_fetch := prepare(Request{
 		url:   'http://httpbin.org/get'
 		proxy: s_proxy
 	})!

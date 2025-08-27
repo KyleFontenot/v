@@ -16,12 +16,12 @@ mut:
 	on_finish(request &Request, response &Response) !
 }
 
-// DownloaderParams is similar to FetchConfig, but it also allows you to pass
+// DownloaderParams is similar to Request, but it also allows you to pass
 // a `downloader: your_downloader_instance` parameter.
 // See also http.SilentStreamingDownloader, and http.TerminalStreamingDownloader .
 @[params]
 pub struct DownloaderParams {
-	FetchConfig
+	Request
 pub mut:
 	downloader &Downloader = &TerminalStreamingDownloader{}
 }
@@ -45,7 +45,7 @@ pub mut:
 // fail, despite saving all the data in the file before that. The default is 65536 bytes.
 pub fn download_file_with_progress(url string, path string, params DownloaderParams) !Response {
 	mut d := unsafe { params.downloader }
-	mut config := params.FetchConfig
+	mut config := params.Request
 	config.url = url
 	config.user_ptr = voidptr(d)
 	config.on_progress_body = download_progres_cb

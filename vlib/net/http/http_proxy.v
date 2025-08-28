@@ -84,7 +84,7 @@ fn (pr &HttpProxy) build_proxy_headers(host string) string {
 	return 'CONNECT ${host} ${version}\r\nHost: ${address}\r\n' + uheaders.join('') + '\r\n'
 }
 
-fn proxy_http_do(host urllib.URL, method Method, path string, req &Request) !Response {
+fn (req &Request) proxy_http_do() !Response {
 	host_name, port := net.split_address(host.hostname())!
 
 	port_part := if port == 80 || port == 0 { '' } else { ':${port}' }
@@ -129,6 +129,7 @@ fn proxy_http_do(host urllib.URL, method Method, path string, req &Request) !Res
 	return error('Invalid Scheme')
 }
 
+// fn (pr &HttpProxy) proxy_dial(host string) !&net.TcpConn {
 fn (pr &HttpProxy) proxy_dial(host string) !&net.TcpConn {
 	if pr.scheme in ['http', 'https'] {
 		mut tcp := net.dial_tcp(pr.host)!

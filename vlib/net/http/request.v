@@ -19,7 +19,7 @@ pub type RequestProgressBodyFn = fn (request &Request, chunk []u8, body_read_so_
 
 pub type RequestFinishFn = fn (request &Request, final_size u64) !
 
-type StrOrUrl =  urllib.URL | string
+type StrOrUrl = urllib.URL | string
 
 // Request holds information about an HTTP request (either received by
 // a server or to be sent by a client)
@@ -39,6 +39,8 @@ pub mut:
 	path       string
 	params     map[string]string
 	proxy      ?&HttpProxy
+	port       int
+
 	// NOT implemented for ssl connections
 	// time = -1 for no timeout
 	read_timeout  i64 = 30 * time.second
@@ -97,22 +99,66 @@ pub fn (req &Request) cookie(name string) ?Cookie {
 	return none
 }
 
+// prepare prepares a new request for fetching, but does not call its .do() method.
+// It is useful, if you want to reuse request objects, for several requests in a row,
+// modifying the request each time, then calling .do() to get the new response.
+pub fn prepare(mut config Request) !Request {
+	// mut url := urllib.URL{}
+	if config.url is string {
+		if (config.url as string).len == 0 {
+			return error('http.fetch: empty url')
+		}
+
+		config.url = urllib.parse(config.url as string) or {
+			return error('http.fetch: invalid url ${config.url}')
+		}
+
+		// TODO form params in the urllib.URL struct. This was the remnants from the build_url_from_fetch() function that was previously invoked here.
+		// mut url := urllib.parse(config.url)!
+		// if config.params.len == 0 {
+		// 	return url as urllib.URL
+		// }
+		//
+		// 	mut pieces := []string{cap: config.params.len}
+		// 	for key, val in config.params {
+		// 		pieces << '${key}=${val}'
+		// 	}
+		// 	mut query := pieces.join('&')
+		// 	if url.raw_query.len > 1 {
+		// 		query = url.raw_query + '&' + query
+		// 	}
+		// 	url.raw_query = query
+		// return url
+
+		// return config
+	}
+
+	if (config.url as urllib.URL).scheme == 'https' {
+		config.port = 443
+	} else if config.port == 0 {
+		if config.cert != '' && config.cert_key != '' {
+			config.port = 443
+		}
+		config.port = 80
+	}
+	return config
+}
+
+fn (mut req Request) prepare() !Request {
+	return prepare(mut req)
+}
 
 // do will send the HTTP request and returns `http.Response` as soon as the response is received
 pub fn (mut req Request) do() !Response {
-	// mut url := urllib.parse(req.url) or { return error('http.Request.do: invalid url ${req.url}') }
-	// mut rurl := url
-	if req.url is string {
-			req.url = urllib.parse(req.url) or { return error('http.Request.do: invalid url ${req.url}') }
-	}
+	req.prepare()!
 	mut resp := Response{}
 	mut nredirects := 0
 	for {
 		if nredirects == max_redirects {
 			return error('http.request.do: maximum number of redirects reached (${max_redirects})')
 		}
-		qresp := req.method_and_url_to_response(req.method, rurl)!
-		resp = qresp
+		resp = req.method_and_url_to_response(req.method, req.url as urllib.URL)!
+
 		if !req.allow_redirect {
 			break
 		}
@@ -123,18 +169,22 @@ pub fn (mut req Request) do() !Response {
 		// follow any redirects
 		mut redirect_url := resp.header.get(.location) or { '' }
 		if redirect_url.len > 0 && redirect_url[0] == `/` {
-			url.set_path(redirect_url) or {
+			mut url_obj := req.url as urllib.URL
+			url_obj.set_path(redirect_url) or {
 				return error('http.request.do: invalid path in redirect: "${redirect_url}"')
 			}
-			redirect_url = url.str()
+
+			// Possibly change RequestRedirectFn type to accept StrOrUrl
+			if req.on_redirect != unsafe { nil } {
+				req.on_redirect(req, nredirects, url_obj.str())!
+			}
+
+			req.url = url_obj
 		}
-		if req.on_redirect != unsafe { nil } {
-			req.on_redirect(req, nredirects, redirect_url)!
-		}
-		qrurl := urllib.parse(redirect_url) or {
-			return error('http.request.do: invalid URL in redirect "${redirect_url}"')
-		}
-		rurl = qrurl
+		// qrurl := urllib.parse(redirect_url) or {
+		// 	return error('http.request.do: invalid URL in redirect "${redirect_url}"')
+		// }
+		// req.url = qrurl
 		nredirects++
 	}
 	return resp
@@ -155,9 +205,21 @@ fn (req &Request) method_and_url_to_response(method Method, url urllib.URL) !Res
 		}
 	}
 	// println('fetch $method, $scheme, $host_name, $nport, $path ')
-	if scheme == 'https'  {
+	if scheme == 'https' {
 		// println('ssl_do( $nport, $method, $host_name, $path )')
 		for i in 0 .. req.max_retries {
+			if req.proxy != none {
+				if req.proxy.url != '' {
+					res := req.ssl_do(nport, method, host_name, path) or {
+						if i == req.max_retries - 1 || is_no_need_retry_error(err.code()) {
+							return err
+						}
+						continue
+					}
+				} else {
+					return error('http.request.method_and_url_to_response: proxy is set but no proxy url')
+				}
+			}
 			res := req.ssl_do(nport, method, host_name, path) or {
 				if i == req.max_retries - 1 || is_no_need_retry_error(err.code()) {
 					return err
@@ -259,87 +321,31 @@ fn (req &Request) build_request_cookies_header() string {
 	return sb_cookie.str()
 }
 
-fn (req &Request) http_do(config &Request) !Response {
-
-	host_name, port := net.split_address(config.host)!
-	mut path := config.path
-
-	if req.proxy != none {
-		if req.proxy.url != '' {
-			path = req.url.str()
-
-			// str_request_headers := req.build_request_headers(config.method, host_name, port, path)
-
-			// url_ := build_url_from_fetch(req)!
-			// Do proxy stuff
-			// return proxy_http_do(url_, config.method, path, req)
-		}
+fn (req &Request) http_do(host string, method Method, path string) !Response {
+	host_name, port := net.split_address(host)!
+	s := req.build_request_headers(method, host_name, port, path)
+	mut client := net.dial_tcp(host)!
+	client.set_read_timeout(req.read_timeout)
+	client.set_write_timeout(req.write_timeout)
+	// TODO: this really needs to be exposed somehow
+	client.write(s.bytes())!
+	$if trace_http_request ? {
+		eprint('> ')
+		eprint(s)
+		eprintln('')
 	}
-
-	str_request_headers := req.build_request_headers(config.method, host_name, port, path)
-
-	if req.scheme == 'https' {
-		// what it is in http_proxy
-
-		if req.proxy != none {
-			if req.proxy.url != '' {
-				proxy := req.proxy
-
-				mut tcp := net.dial_tcp(proxy.host)!
-				tcp.write(proxy.build_proxy_headers(config.url.host.bytes())!
-				mut bf := []u8{len: 4096}
-
-				if !bf.bytestr().contains('HTTP/1.1 200') {
-					return error('ssl dial error: ${bf.bytestr()}')
-				}
-
-				if req.proxy.scheme == 'socks5'{
-
-					mut client:= socks.socks5_ssl_dial(pr.host, host, pr.username, pr.password)!
-				} else {
-
-				mut ssl_conn := ssl.new_ssl_conn(
-						verify:                 ''
-						cert:                   ''
-						cert_key:               ''
-						validate:               false
-						in_memory_verification: false
-						)!
-				ssl_conn.connect(mut tcp, host.all_before_last(':'))!
-				mut client := ssl_conn;
-				}
-
-			}
-		}
-	} else if req.scheme == 'http' {
-		// HTTP combining the proxy handler
-		mut client := net.dial_tcp(config.host)!
-
-
-		client.set_read_timeout(req.read_timeout)
-		client.set_write_timeout(req.write_timeout)
-		// TODO: this really needs to be exposed somehow
-		client.write(str_request_headers.bytes())!
-		$if trace_http_request ? {
-			eprint('> ')
-			eprint(str_request_headers)
-			eprintln('')
-		}
-		mut bytes := req.read_all_from_client_connection(client)!
-		client.close()!
-		response_text := bytes.bytestr()
-		$if trace_http_response ? {
-			eprint('< ')
-			eprint(response_text)
-			eprintln('')
-		}
-		if req.on_finish != unsafe { nil } {
-			req.on_finish(req, u64(response_text.len))!
-		}
-		return parse_response(response_text)
+	mut bytes := req.read_all_from_client_connection(client)!
+	client.close()!
+	response_text := bytes.bytestr()
+	$if trace_http_response ? {
+		eprint('< ')
+		eprint(response_text)
+		eprintln('')
 	}
-	// handle other schemes in the future
-	return error('unsupported scheme: ${req.scheme}')
+	if req.on_finish != unsafe { nil } {
+		req.on_finish(req, u64(response_text.len))!
+	}
+	return parse_response(response_text)
 }
 
 // abstract over reading the whole content from TCP or SSL connections:

@@ -109,28 +109,11 @@ pub fn delete(url string) !Response {
 	return fetch(method: .delete, url: url)
 }
 
-// prepare prepares a new request for fetching, but does not call its .do() method.
-// It is useful, if you want to reuse request objects, for several requests in a row,
-// modifying the request each time, then calling .do() to get the new response.
-pub fn prepare(config Request) !Request {
-	if config.url == '' {
-		return error('http.fetch: empty url')
-	}
-	url := build_url_from_fetch(&config) or {
-		return error('http.fetch: invalid url ${config.url}')
-	}
-
-	return Request{
-		...config
-		url: url
-	}
-}
-
 // TODO: @[noinline] attribute is used for temporary fix the 'get_text()' intermittent segfault / nil value when compiling with GCC 13.2.x and -prod option ( Issue #20506 )
 // fetch sends an HTTP request to the `url` with the given method and configuration.
 @[noinline]
-pub fn fetch(config Request) !Response {
-	req := prepare(config)!
+pub fn fetch(mut config Request) !Response {
+	mut req := prepare(mut config)!
 	return req.do()!
 }
 
@@ -149,22 +132,4 @@ pub fn url_encode_form_data(data map[string]string) string {
 		pieces << '${key}=${value}'
 	}
 	return pieces.join('&')
-}
-
-fn build_url_from_fetch(config &Request) !urllib.URL {
-	mut url := urllib.parse(config.url)!
-	if config.params.len == 0 {
-		return url
-	}
-
-	mut pieces := []string{cap: config.params.len}
-	for key, val in config.params {
-		pieces << '${key}=${val}'
-	}
-	mut query := pieces.join('&')
-	if url.raw_query.len > 1 {
-		query = url.raw_query + '&' + query
-	}
-	url.raw_query = query
-	return url
 }

@@ -270,29 +270,32 @@ fn (req &Request) http_do(config &Request) !Response {
 
 	if req.proxy != none {
 		path = req.url
+		_url := build_url_from_fetch(&req)!
+		return proxy_http_do(req.proxy.url, config.method, path, &req)
+	} else {
+		mut client := net.dial_tcp(config.host)!
+		client.set_read_timeout(req.read_timeout)
+		client.set_write_timeout(req.write_timeout)
+		// TODO: this really needs to be exposed somehow
+		client.write(s.bytes())!
+		$if trace_http_request ? {
+			eprint('> ')
+			eprint(s)
+			eprintln('')
+		}
+		mut bytes := req.read_all_from_client_connection(client)!
+		client.close()!
+		response_text := bytes.bytestr()
+		$if trace_http_response ? {
+			eprint('< ')
+			eprint(response_text)
+			eprintln('')
+		}
+		if req.on_finish != unsafe { nil } {
+			req.on_finish(req, u64(response_text.len))!
+		}
+		return parse_response(response_text)
 	}
-	mut client := net.dial_tcp(config.host)!
-	client.set_read_timeout(req.read_timeout)
-	client.set_write_timeout(req.write_timeout)
-	// TODO: this really needs to be exposed somehow
-	client.write(s.bytes())!
-	$if trace_http_request ? {
-		eprint('> ')
-		eprint(s)
-		eprintln('')
-	}
-	mut bytes := req.read_all_from_client_connection(client)!
-	client.close()!
-	response_text := bytes.bytestr()
-	$if trace_http_response ? {
-		eprint('< ')
-		eprint(response_text)
-		eprintln('')
-	}
-	if req.on_finish != unsafe { nil } {
-		req.on_finish(req, u64(response_text.len))!
-	}
-	return parse_response(response_text)
 }
 
 // abstract over reading the whole content from TCP or SSL connections:

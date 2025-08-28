@@ -122,7 +122,7 @@ pub fn prepare(config Request) !Request {
 
 	return Request{
 		...config
-		url: url
+		url: url.str()
 	}
 }
 
@@ -151,10 +151,10 @@ pub fn url_encode_form_data(data map[string]string) string {
 	return pieces.join('&')
 }
 
-fn build_url_from_fetch(config &Request) !string {
+fn build_url_from_fetch(config &Request) !urllib.URL {
 	mut url := urllib.parse(config.url)!
 	if config.params.len == 0 {
-		return url.str()
+		return url
 	}
 
 	mut pieces := []string{cap: config.params.len}
@@ -166,5 +166,5 @@ fn build_url_from_fetch(config &Request) !string {
 		query = url.raw_query + '&' + query
 	}
 	url.raw_query = query
-	return url.str()
+	return url
 }

@@ -129,7 +129,7 @@ fn proxy_http_do(host urllib.URL, method Method, path string, req &Request) !Res
 	return error('Invalid Scheme')
 }
 
-fn (pr &HttpProxy) dial(host string) !&net.TcpConn {
+fn (pr &HttpProxy) proxy_dial(host string) !&net.TcpConn {
 	if pr.scheme in ['http', 'https'] {
 		mut tcp := net.dial_tcp(pr.host)!
 		tcp.write(pr.build_proxy_headers(host).bytes())!
@@ -144,7 +144,7 @@ fn (pr &HttpProxy) dial(host string) !&net.TcpConn {
 	}
 }
 
-fn (pr &HttpProxy) ssl_dial(host string) !&ssl.SSLConn {
+fn (pr &HttpProxy) proxy_ssl_dial(host string) !&ssl.SSLConn {
 	if pr.scheme in ['http', 'https'] {
 		mut tcp := net.dial_tcp(pr.host)!
 		tcp.write(pr.build_proxy_headers(host).bytes())!

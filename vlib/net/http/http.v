@@ -122,7 +122,7 @@ pub fn prepare(config Request) !Request {
 
 	return Request{
 		...config
-		url: url.str()
+		url: url
 	}
 }
 

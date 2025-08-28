@@ -9,6 +9,7 @@ import net.urllib
 import rand
 import strings
 import time
+import socks
 
 pub type RequestRedirectFn = fn (request &Request, nredirects int, new_url string) !
 
@@ -17,6 +18,8 @@ pub type RequestProgressFn = fn (request &Request, chunk []u8, read_so_far u64) 
 pub type RequestProgressBodyFn = fn (request &Request, chunk []u8, body_read_so_far u64, body_expected_size u64, status_code int) !
 
 pub type RequestFinishFn = fn (request &Request, final_size u64) !
+
+type StrOrUrl =  urllib.URL | string
 
 // Request holds information about an HTTP request (either received by
 // a server or to be sent by a client)
@@ -29,7 +32,7 @@ pub mut:
 	header     Header
 	host       string
 	data       string
-	url        string
+	url        StrOrUrl
 	user_agent string = 'v.http'
 	verbose    bool
 	user_ptr   voidptr
@@ -94,10 +97,14 @@ pub fn (req &Request) cookie(name string) ?Cookie {
 	return none
 }
 
+
 // do will send the HTTP request and returns `http.Response` as soon as the response is received
-pub fn (req &Request) do() !Response {
-	mut url := urllib.parse(req.url) or { return error('http.Request.do: invalid url ${req.url}') }
-	mut rurl := url
+pub fn (mut req Request) do() !Response {
+	// mut url := urllib.parse(req.url) or { return error('http.Request.do: invalid url ${req.url}') }
+	// mut rurl := url
+	if req.url is string {
+			req.url = urllib.parse(req.url) or { return error('http.Request.do: invalid url ${req.url}') }
+	}
 	mut resp := Response{}
 	mut nredirects := 0
 	for {
@@ -148,7 +155,7 @@ fn (req &Request) method_and_url_to_response(method Method, url urllib.URL) !Res
 		}
 	}
 	// println('fetch $method, $scheme, $host_name, $nport, $path ')
-	if scheme == 'https' && req.proxy == unsafe { nil } {
+	if scheme == 'https'  {
 		// println('ssl_do( $nport, $method, $host_name, $path )')
 		for i in 0 .. req.max_retries {
 			res := req.ssl_do(nport, method, host_name, path) or {
@@ -159,20 +166,10 @@ fn (req &Request) method_and_url_to_response(method Method, url urllib.URL) !Res
 			}
 			return res
 		}
-	} else if scheme == 'http' && req.proxy == unsafe { nil } {
+	} else if scheme == 'http' {
 		// println('http_do( $nport, $method, $host_name, $path )')
 		for i in 0 .. req.max_retries {
-			res := req.http_do('${host_name}:${nport}', method, path) or {
-				if i == req.max_retries - 1 || is_no_need_retry_error(err.code()) {
-					return err
-				}
-				continue
-			}
-			return res
-		}
-	} else if req.proxy != unsafe { nil } {
-		for i in 0 .. req.max_retries {
-			res := req.proxy.http_do(url, method, path, req) or {
+			res := req.http_do(req) or {
 				if i == req.max_retries - 1 || is_no_need_retry_error(err.code()) {
 					return err
 				}
@@ -263,24 +260,69 @@ fn (req &Request) build_request_cookies_header() string {
 }
 
 fn (req &Request) http_do(config &Request) !Response {
+
 	host_name, port := net.split_address(config.host)!
 	mut path := config.path
 
-	s := req.build_request_headers(config.method, host_name, port, path)
-
 	if req.proxy != none {
-		path = req.url
-		_url := build_url_from_fetch(&req)!
-		return proxy_http_do(req.proxy.url, config.method, path, &req)
-	} else {
+		if req.proxy.url != '' {
+			path = req.url.str()
+
+			// str_request_headers := req.build_request_headers(config.method, host_name, port, path)
+
+			// url_ := build_url_from_fetch(req)!
+			// Do proxy stuff
+			// return proxy_http_do(url_, config.method, path, req)
+		}
+	}
+
+	str_request_headers := req.build_request_headers(config.method, host_name, port, path)
+
+	if req.scheme == 'https' {
+		// what it is in http_proxy
+
+		if req.proxy != none {
+			if req.proxy.url != '' {
+				proxy := req.proxy
+
+				mut tcp := net.dial_tcp(proxy.host)!
+				tcp.write(proxy.build_proxy_headers(config.url.host.bytes())!
+				mut bf := []u8{len: 4096}
+
+				if !bf.bytestr().contains('HTTP/1.1 200') {
+					return error('ssl dial error: ${bf.bytestr()}')
+				}
+
+				if req.proxy.scheme == 'socks5'{
+
+					mut client:= socks.socks5_ssl_dial(pr.host, host, pr.username, pr.password)!
+				} else {
+
+				mut ssl_conn := ssl.new_ssl_conn(
+						verify:                 ''
+						cert:                   ''
+						cert_key:               ''
+						validate:               false
+						in_memory_verification: false
+						)!
+				ssl_conn.connect(mut tcp, host.all_before_last(':'))!
+				mut client := ssl_conn;
+				}
+
+			}
+		}
+	} else if req.scheme == 'http' {
+		// HTTP combining the proxy handler
 		mut client := net.dial_tcp(config.host)!
+
+
 		client.set_read_timeout(req.read_timeout)
 		client.set_write_timeout(req.write_timeout)
 		// TODO: this really needs to be exposed somehow
-		client.write(s.bytes())!
+		client.write(str_request_headers.bytes())!
 		$if trace_http_request ? {
 			eprint('> ')
-			eprint(s)
+			eprint(str_request_headers)
 			eprintln('')
 		}
 		mut bytes := req.read_all_from_client_connection(client)!
@@ -296,6 +338,8 @@ fn (req &Request) http_do(config &Request) !Response {
 		}
 		return parse_response(response_text)
 	}
+	// handle other schemes in the future
+	return error('unsupported scheme: ${req.scheme}')
 }
 
 // abstract over reading the whole content from TCP or SSL connections:

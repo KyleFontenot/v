@@ -33,8 +33,9 @@ pub mut:
 	user_agent string = 'v.http'
 	verbose    bool
 	user_ptr   voidptr
+	path       string
 	params     map[string]string
-	proxy      &HttpProxy = unsafe { nil }
+	proxy      ?&HttpProxy
 	// NOT implemented for ssl connections
 	// time = -1 for no timeout
 	read_timeout  i64 = 30 * time.second
@@ -261,10 +262,16 @@ fn (req &Request) build_request_cookies_header() string {
 	return sb_cookie.str()
 }
 
-fn (req &Request) http_do(host string, method Method, path string) !Response {
-	host_name, port := net.split_address(host)!
-	s := req.build_request_headers(method, host_name, port, path)
-	mut client := net.dial_tcp(host)!
+fn (req &Request) http_do(config &Request) !Response {
+	host_name, port := net.split_address(config.host)!
+	mut path := config.path
+
+	s := req.build_request_headers(config.method, host_name, port, path)
+
+	if req.proxy != none {
+		path = req.url
+	}
+	mut client := net.dial_tcp(config.host)!
 	client.set_read_timeout(req.read_timeout)
 	client.set_write_timeout(req.write_timeout)
 	// TODO: this really needs to be exposed somehow

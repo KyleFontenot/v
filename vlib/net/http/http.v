@@ -11,23 +11,6 @@ const content_type_default = 'text/plain'
 
 const bufsize = 64 * 1024
 
-// new_request creates a new Request given the request `method`, `url_`, and
-// `data`.
-pub fn new_request(method Method, url_ string, data string, proxy ?&HttpProxy) Request {
-	url := if method == .get && !url_.contains('?') { url_ + '?' + data } else { url_ }
-	// println('new req() method=$method url="$url" dta="$data"')
-	return Request{
-		method: method
-		url:    url
-		data:   data
-		/*
-		headers: {
-			'Accept-Encoding': 'compress'
-		}
-		*/
-	}
-}
-
 // get sends a GET HTTP request to the given `url`.
 pub fn get(url string) !Response {
 	return fetch(method: .get, url: url)
@@ -133,7 +116,10 @@ pub fn prepare(config Request) !Request {
 	if config.url == '' {
 		return error('http.fetch: empty url')
 	}
-	url := build_url_from_fetch(config) or { return error('http.fetch: invalid url ${config.url}') }
+	url := build_url_from_fetch(&config) or {
+		return error('http.fetch: invalid url ${config.url}')
+	}
+
 	return Request{
 		...config
 		url: url
@@ -165,11 +151,12 @@ pub fn url_encode_form_data(data map[string]string) string {
 	return pieces.join('&')
 }
 
-fn build_url_from_fetch(config Request) !string {
+fn build_url_from_fetch(config &Request) !string {
 	mut url := urllib.parse(config.url)!
 	if config.params.len == 0 {
 		return url.str()
 	}
+
 	mut pieces := []string{cap: config.params.len}
 	for key, val in config.params {
 		pieces << '${key}=${val}'

@@ -85,7 +85,7 @@ fn (pr &HttpProxy) build_proxy_headers(host string) string {
 }
 
 fn (req &Request) proxy_http_do() !Response {
-	host_name, port := net.split_address(host.hostname())!
+	host_name, port := net.split_address(req.url.hostname())!
 
 	port_part := if port == 80 || port == 0 { '' } else { ':${port}' }
 

@@ -31,7 +31,7 @@ pub mut:
 	header     Header
 	host       string
 	data       string
-	url        StrOrUrl
+	url        urllib.URL
 	user_agent string = 'v.http'
 	verbose    bool
 	user_ptr   voidptr
@@ -130,7 +130,7 @@ pub fn prepare(config &Request) !Request {
 		// 	url.raw_query = query
 		// return url
 
-		// return config
+		return prepared
 	}
 
 	if (config.url as urllib.URL).scheme == 'https' {
@@ -144,20 +144,21 @@ pub fn prepare(config &Request) !Request {
 	return prepared
 }
 
-fn (req Request) prepare() !Request {
+fn (req &Request) prepare() !Request {
 	return prepare(req)
 }
 
 // do will send the HTTP request and returns `http.Response` as soon as the response is received
-pub fn (req Request) do() !Response {
+pub fn (req &Request) do() !Response {
 	req.prepare()!
 	mut resp := Response{}
 	mut nredirects := 0
+	mut qrurl := req.url as urllib.URL
 	for {
 		if nredirects == max_redirects {
 			return error('http.request.do: maximum number of redirects reached (${max_redirects})')
 		}
-		resp = req.method_and_url_to_response(req.method, req.url as urllib.URL)!
+		resp = req.method_and_url_to_response(req.method, qrurl)!
 
 		if !req.allow_redirect {
 			break
@@ -179,7 +180,7 @@ pub fn (req Request) do() !Response {
 				req.on_redirect(req, nredirects, url_obj.str())!
 			}
 
-			req.url = url_obj
+			qrurl = url_obj
 		}
 		// qrurl := urllib.parse(redirect_url) or {
 		// 	return error('http.request.do: invalid URL in redirect "${redirect_url}"')

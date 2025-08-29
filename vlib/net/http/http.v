@@ -94,37 +94,74 @@ pub fn put(url string, data string) !Response {
 }
 
 // patch sends string `data` as an HTTP PATCH request to the given `url`.
-pub fn patch(url string, data string) !Response {
-	return fetch(
-		method: .patch
-		url:    url
-		data:   data
-		header: new_header(key: .content_type, value: content_type_default)
-	)
+
+@[noinline]
+pub fn patch(req StrOrRequest) !Response {
+	mut r := handle_fetch_param(&req)!
+	r.method = .patch
+	r.header = new_header(key: .content_type, value: content_type_default)
+	return r.do()!
 }
 
-// head sends an HTTP HEAD request to the given `url`.
-pub fn head(url string) !Response {
-	return fetch(method: .head, url: url)
+type StrOrRequest = string | Request
+
+fn url_from_str(str string) !Request {
+	url := urllib.parse(str) or { return error('http.url_from_str: invalid url: "${str}"') }
+	return Request{
+		url: url
+	}
 }
 
-// delete sends an HTTP DELETE request to the given `url`.
-pub fn delete(url string) !Response {
-	return fetch(method: .delete, url: url)
+fn handle_fetch_param(req &StrOrRequest) !Request {
+	return match req {
+		string {
+			url := urllib.parse(req) or { return error('http.url_from_str: invalid url: "${req}"') }
+			mut new_req := Request{
+				url: url
+			}
+			new_req.prepare()!
+			new_req
+		}
+		Request {
+			mut r := req
+			r.prepare()!
+			r
+		}
+	}
 }
 
 // TODO: @[noinline] attribute is used for temporary fix the 'get_text()' intermittent segfault / nil value when compiling with GCC 13.2.x and -prod option ( Issue #20506 )
 // fetch sends an HTTP request to the `url` with the given method and configuration.
+// @[noinline]
+// pub fn fetch(params FetchParams) !Response {
+// 	handle_fetch_param(params.req)!
+// 	mut r := params.req as Request
+// 	r.method = params.method
+// 	return r.do()!
+// }
+// fetch with the 'HEAD' method
 @[noinline]
-pub fn fetch(config Request) !Response {
-	mut clone := config
-	mut req := prepare(clone)!
-	return req.do()
+pub fn head(mut req StrOrRequest) !Response {
+	mut r := handle_fetch_param(&req)!
+	r.method = .head
+	return r.do()!
+}
+
+// fetch with the 'DELETE' method
+@[noinline]
+pub fn delete(req StrOrRequest) !Response {
+	mut r := handle_fetch_param(&req)!
+	r.method = .head
+	return r.do()!
 }
 
 // get_text sends an HTTP GET request to the given `url` and returns the text content of the response.
+@[noinline]
 pub fn get_text(url string) string {
-	resp := fetch(url: url, method: .get) or { return '' }
+	resp := get(url) or {
+		println('http.get_text: ${err}')
+		return ''
+	}
 	return resp.body
 }
 

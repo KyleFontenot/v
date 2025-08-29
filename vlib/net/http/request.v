@@ -9,7 +9,6 @@ import net.urllib
 import rand
 import strings
 import time
-import socks
 
 pub type RequestRedirectFn = fn (request &Request, nredirects int, new_url string) !
 
@@ -19,7 +18,7 @@ pub type RequestProgressBodyFn = fn (request &Request, chunk []u8, body_read_so_
 
 pub type RequestFinishFn = fn (request &Request, final_size u64) !
 
-type StrOrUrl = urllib.URL | string
+pub type StrOrUrl = urllib.URL | string
 
 // Request holds information about an HTTP request (either received by
 // a server or to be sent by a client)
@@ -102,14 +101,15 @@ pub fn (req &Request) cookie(name string) ?Cookie {
 // prepare prepares a new request for fetching, but does not call its .do() method.
 // It is useful, if you want to reuse request objects, for several requests in a row,
 // modifying the request each time, then calling .do() to get the new response.
-pub fn prepare(mut config Request) !Request {
+pub fn prepare(config &Request) !Request {
 	// mut url := urllib.URL{}
+	mut prepared := *config
 	if config.url is string {
 		if (config.url as string).len == 0 {
 			return error('http.fetch: empty url')
 		}
 
-		config.url = urllib.parse(config.url as string) or {
+		prepared.url = urllib.parse(config.url as string) or {
 			return error('http.fetch: invalid url ${config.url}')
 		}
 
@@ -134,22 +134,22 @@ pub fn prepare(mut config Request) !Request {
 	}
 
 	if (config.url as urllib.URL).scheme == 'https' {
-		config.port = 443
+		prepared.port = 443
 	} else if config.port == 0 {
 		if config.cert != '' && config.cert_key != '' {
-			config.port = 443
+			prepared.port = 443
 		}
-		config.port = 80
+		prepared.port = 80
 	}
-	return config
+	return prepared
 }
 
-fn (mut req Request) prepare() !Request {
-	return prepare(mut req)
+fn (req Request) prepare() !Request {
+	return prepare(req)
 }
 
 // do will send the HTTP request and returns `http.Response` as soon as the response is received
-pub fn (mut req Request) do() !Response {
+pub fn (req Request) do() !Response {
 	req.prepare()!
 	mut resp := Response{}
 	mut nredirects := 0
@@ -231,7 +231,7 @@ fn (req &Request) method_and_url_to_response(method Method, url urllib.URL) !Res
 	} else if scheme == 'http' {
 		// println('http_do( $nport, $method, $host_name, $path )')
 		for i in 0 .. req.max_retries {
-			res := req.http_do(req) or {
+			res := req.http_do() or {
 				if i == req.max_retries - 1 || is_no_need_retry_error(err.code()) {
 					return err
 				}
@@ -321,8 +321,8 @@ fn (req &Request) build_request_cookies_header() string {
 	return sb_cookie.str()
 }
 
-fn (req &Request) http_do(host string, method Method, path string) !Response {
-	host_name, port := net.split_address(host)!
+fn (req &Request) http_do() !Response {
+	host_name, port := net.split_address(req.host)!
 	s := req.build_request_headers(method, host_name, port, path)
 	mut client := net.dial_tcp(host)!
 	client.set_read_timeout(req.read_timeout)

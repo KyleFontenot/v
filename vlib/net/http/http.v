@@ -13,11 +13,15 @@ const bufsize = 64 * 1024
 
 // get sends a GET HTTP request to the given `url`.
 pub fn get(url string) !Response {
-	return fetch(method: .get, url: url)
+	mut req := Request{
+		method: .get
+		url:    url
+	}
+	return fetch(req)
 }
 
 // post sends the string `data` as an HTTP POST request to the given `url`.
-pub fn post(url string, data string) !Response {
+pub fn post(url StrOrUrl, data string) !Response {
 	return fetch(
 		method: .post
 		url:    url
@@ -112,9 +116,10 @@ pub fn delete(url string) !Response {
 // TODO: @[noinline] attribute is used for temporary fix the 'get_text()' intermittent segfault / nil value when compiling with GCC 13.2.x and -prod option ( Issue #20506 )
 // fetch sends an HTTP request to the `url` with the given method and configuration.
 @[noinline]
-pub fn fetch(mut config Request) !Response {
-	mut req := prepare(mut config)!
-	return req.do()!
+pub fn fetch(config Request) !Response {
+	mut clone := config
+	mut req := prepare(clone)!
+	return req.do()
 }
 
 // get_text sends an HTTP GET request to the given `url` and returns the text content of the response.

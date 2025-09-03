@@ -84,7 +84,7 @@ fn test_support_http_1() {
 	// HTTP 1.0 always closes the connection after each request, so the client must
 	// send the Connection: close header. If that header is present the connection
 	// needs to be closed and a `Connection: close` header needs to be send back
-	mut x := http.fetch(http.FetchConfig{
+	mut x := http.fetch(http.Request{
 		url:    'http://${localserver}/'
 		header: http.new_header_from_map({
 			.connection: 'close'

@@ -9,11 +9,11 @@ pub fn get_users(token string) ![]User {
 
 	url := 'http://localhost:8082/controller/users'
 
-	mut config := http.FetchConfig{
+	mut config := http.Request{
 		header: header
 	}
 
-	resp := http.fetch(http.FetchConfig{ ...config, url: url })!
+	resp := http.fetch(url, &http.Request{ ...config, url: url })!
 	users := json.decode([]User, resp.body)!
 
 	return users
@@ -25,11 +25,11 @@ pub fn get_user(token string) !User {
 
 	url := 'http://localhost:8082/controller/user'
 
-	mut config := http.FetchConfig{
+	mut config := http.Request{
 		header: header
 	}
 
-	resp := http.fetch(http.FetchConfig{ ...config, url: url })!
+	resp := http.fetch(url, &http.Request{ ...config, url: url })!
 	users := json.decode(User, resp.body)!
 
 	return users

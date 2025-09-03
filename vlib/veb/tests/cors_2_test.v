@@ -52,8 +52,7 @@ fn testsuite_begin() {
 }
 
 fn test_valid_cors() {
-	x := http.fetch(http.FetchConfig{
-		url:    localserver
+	x := http.fetch(localserver, &http.Request{
 		method: .get
 		header: http.new_header_from_map({
 			.origin: allowed_origin
@@ -65,8 +64,7 @@ fn test_valid_cors() {
 }
 
 fn test_preflight() {
-	x := http.fetch(http.FetchConfig{
-		url:    localserver
+	x := http.fetch(localserver, &http.Request{
 		method: .options
 		header: http.new_header_from_map({
 			.origin: allowed_origin
@@ -83,8 +81,7 @@ fn test_preflight() {
 }
 
 fn test_invalid_origin() {
-	x := http.fetch(http.FetchConfig{
-		url:    localserver
+	x := http.fetch(localserver, &http.Request{
 		method: .get
 		header: http.new_header_from_map({
 			.origin: 'https://google.com'
@@ -95,8 +92,7 @@ fn test_invalid_origin() {
 }
 
 fn test_invalid_method() {
-	x := http.fetch(http.FetchConfig{
-		url:    '${localserver}/post'
+	x := http.fetch('${localserver}/post', &http.Request{
 		method: .post
 		header: http.new_header_from_map({
 			.origin: allowed_origin

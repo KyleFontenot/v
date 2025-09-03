@@ -71,7 +71,7 @@ fn test_large_request_header() {
 
 	str := buf.bytestr()
 	// make 1 header longer than vebs max read limit
-	mut x := http.fetch(http.FetchConfig{
+	mut x := http.fetch(http.Request{
 		url:    localserver
 		header: http.new_custom_header_from_map({
 			'X-Overflow-Header': str
@@ -83,7 +83,7 @@ fn test_large_request_header() {
 
 fn test_bigger_content_length() {
 	data := '123456789'
-	mut x := http.fetch(http.FetchConfig{
+	mut x := http.fetch(http.Request{
 		method: .post
 		url:    '${localserver}/post_request'
 		header: http.new_header_from_map({
@@ -98,7 +98,7 @@ fn test_bigger_content_length() {
 
 fn test_smaller_content_length() {
 	data := '123456789'
-	mut x := http.fetch(http.FetchConfig{
+	mut x := http.fetch(http.Request{
 		method: .post
 		url:    '${localserver}/post_request'
 		header: http.new_header_from_map({

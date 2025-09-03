@@ -52,7 +52,7 @@ fn testsuite_begin() {
 }
 
 fn test_valid_cors() {
-	x := http.fetch(http.FetchConfig{
+	x := http.fetch(http.Request{
 		url:    localserver
 		method: .get
 		header: http.new_header_from_map({
@@ -65,7 +65,7 @@ fn test_valid_cors() {
 }
 
 fn test_preflight() {
-	x := http.fetch(http.FetchConfig{
+	x := http.fetch(http.Request{
 		url:    localserver
 		method: .options
 		header: http.new_header_from_map({
@@ -83,7 +83,7 @@ fn test_preflight() {
 }
 
 fn test_invalid_origin() {
-	x := http.fetch(http.FetchConfig{
+	x := http.fetch(http.Request{
 		url:    localserver
 		method: .get
 		header: http.new_header_from_map({
@@ -95,7 +95,7 @@ fn test_invalid_origin() {
 }
 
 fn test_invalid_method() {
-	x := http.fetch(http.FetchConfig{
+	x := http.fetch(http.Request{
 		url:    '${localserver}/post'
 		method: .post
 		header: http.new_header_from_map({

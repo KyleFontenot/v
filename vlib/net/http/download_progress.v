@@ -21,7 +21,7 @@ mut:
 // See also http.SilentStreamingDownloader, and http.TerminalStreamingDownloader .
 @[params]
 pub struct DownloaderParams {
-	FetchConfig
+	Request
 pub mut:
 	downloader &Downloader = &TerminalStreamingDownloader{}
 }

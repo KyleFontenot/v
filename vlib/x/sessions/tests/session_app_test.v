@@ -169,7 +169,7 @@ fn get_session_id() !string {
 }
 
 fn make_request_with_session_id(method http.Method, path string, sid string) !http.Response {
-	return http.fetch(http.FetchConfig{
+	return http.fetch(http.Request{
 		url:     '${localserver}${path}'
 		method:  method
 		cookies: {

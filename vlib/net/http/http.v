@@ -108,10 +108,9 @@ pub fn prepare(config Request) !Request {
 		return error('http.fetch: empty url')
 	}
 	// TODO: enter in more sanity checks for the values of Requests
-	req := Request{
+	return Request{
 		...config
 	}
-	return req
 }
 
 fn (mut req Request) prepare() !Request {

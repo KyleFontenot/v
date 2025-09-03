@@ -52,8 +52,7 @@ fn test_no_user_provided_allowed_headers() {
 		origins: [allowed_origin]
 	})!
 
-	x := http.fetch(http.FetchConfig{
-		url:    localserver
+	x := http.fetch(localserver, http.Request{
 		method: http.Method.options
 		header: http.new_header_from_map({
 			http.CommonHeader.origin: allowed_origin
@@ -73,8 +72,7 @@ fn test_user_provided_allowed_header() {
 		allowed_headers: ['content-type']
 	})!
 
-	x := http.fetch(http.FetchConfig{
-		url:    localserver
+	x := http.fetch(localserver, http.Request{
 		method: http.Method.options
 		header: http.new_header_from_map({
 			http.CommonHeader.origin: allowed_origin
@@ -96,8 +94,7 @@ fn test_user_provided_allowed_header_wildcard() {
 		allowed_headers: ['*']
 	})!
 
-	x := http.fetch(http.FetchConfig{
-		url:    localserver
+	x := http.fetch(localserver, http.Request{
 		method: http.Method.options
 		header: http.new_header_from_map({
 			http.CommonHeader.origin: allowed_origin
@@ -118,7 +115,7 @@ fn test_request_has_access_control_request_headers() {
 		origins: [allowed_origin]
 	})!
 
-	x := http.fetch(http.FetchConfig{
+	x := http.fetch(http.Request{
 		url:    localserver
 		method: http.Method.options
 		header: http.new_header_from_map({
@@ -143,8 +140,7 @@ fn test_allow_credentials_non_preflight() {
 		allow_credentials: true
 	})!
 
-	x := http.fetch(http.FetchConfig{
-		url:    localserver
+	x := http.fetch(localserver, http.Request{
 		header: http.new_header_from_map({
 			http.CommonHeader.origin: allowed_origin
 		})

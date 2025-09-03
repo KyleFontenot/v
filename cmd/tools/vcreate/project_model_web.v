@@ -528,11 +528,11 @@ pub fn get_products(token string) ![]Product {
 	header.add_custom('token', token)!
 	url := 'http://localhost:8082/controller/products'
 
-	mut config := http.FetchConfig{
+	mut config := http.Request{
 		header: header
 	}
 
-	resp := http.fetch(http.FetchConfig{ ...config, url: url })!
+	resp := http.fetch(url, http.Request{ ...config })!
 	products := json.decode([]Product, resp.body)!
 
 	return products
@@ -544,11 +544,11 @@ pub fn get_product(token string) ![]User {
 
 	url := 'http://localhost:8082/controller/product'
 
-	mut config := http.FetchConfig{
+	mut config := http.Request{
 		header: header
 	}
 
-	resp := http.fetch(http.FetchConfig{ ...config, url: url })!
+	resp := http.fetch(url, &http.Request{ ...config })!
 	products := json.decode([]User, resp.body)!
 
 	return products
@@ -744,11 +744,11 @@ pub fn get_users(token string) ![]User {
 
 	url := 'http://localhost:8082/controller/users'
 
-	mut config := http.FetchConfig{
+	mut config := http.Request{
 		header: header
 	}
 
-	resp := http.fetch(http.FetchConfig{ ...config, url: url })!
+	resp := http.fetch(url, &http.Request{ ...config, url: url })!
 	users := json.decode([]User, resp.body)!
 
 	return users
@@ -760,11 +760,11 @@ pub fn get_user(token string) !User {
 
 	url := 'http://localhost:8082/controller/user'
 
-	mut config := http.FetchConfig{
+	mut config := http.Request{
 		header: header
 	}
 
-	resp := http.fetch(http.FetchConfig{ ...config, url: url })!
+	resp := http.fetch(url, &http.Request{ ...config })!
 	users := json.decode(User, resp.body)!
 
 	return users
